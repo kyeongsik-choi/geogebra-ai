@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoGebra AI 도우미</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #f0f2f5;
+      overflow: hidden;
+    }
+    #header {
+      background: #1a2a3a;
+      color: white;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+    #header h1 { font-size: 16px; font-weight: 600; flex: 1; letter-spacing: -0.3px; }
+    #header span { font-size: 12px; color: #8bc; }
+    #main { display: flex; flex: 1; overflow: hidden; }
+    #ggb-panel {
+      flex: 6;
+      overflow: hidden;
+      background: #fff;
+      border-right: 2px solid #d0d5dc;
+    }
+    #ggb-element { width: 100%; height: 100%; }
+    #chat-panel {
+      flex: 4;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      min-width: 320px;
+    }
+    #chat-header {
+      background: #f7f8fa;
+      border-bottom: 1px solid #e0e4ea;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #445;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot { width: 8px; height: 8px; background: #27ae60; border-radius: 50%; display: inline-block; }
+    #chat-header-title { flex: 1; }
+    #analyze-btn {
+      padding: 5px 12px;
+      background: #7c3aed;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    #analyze-btn:hover { background: #6d28d9; }
+    #analyze-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+    #chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #chat-messages::-webkit-scrollbar { width: 5px; }
+    #chat-messages::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    .message {
+      max-width: 92%;
+      padding: 9px 13px;
+      border-radius: 14px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+    .message.user { align-self: flex-end; background: #0a84ff; color: white; border-bottom-right-radius: 4px; }
+    .message.assistant { align-self: flex-start; background: #f1f3f6; color: #222; border-bottom-left-radius: 4px; }
+    .message.analysis {
+      align-self: flex-start;
+      background: #f5f0ff;
+      border: 1px solid #ddd6fe;
+      color: #222;
+      border-bottom-left-radius: 4px;
+      max-width: 97%;
+    }
+    .analysis-badge {
+      display: inline-block;
+      background: #7c3aed;
+      color: white;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .cmd-block {
+      background: #1a1a2e;
+      border: 1px solid #2e4a6e;
+      color: #79c0ff;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin: 7px 0;
+      font-family: 'Consolas', 'Menlo', monospace;
+      font-size: 12.5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .cmd-block code { flex: 1; word-break: break-all; }
+    .apply-btn {
+      background: #238636;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .apply-btn:hover { background: #2ea043; }
+    .apply-btn.applied { background: #444d56; cursor: default; }
+    .apply-btn.error { background: #c0392b; }
+    .obj-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; background: white; border-radius: 6px; overflow: hidden; }
+    .obj-table th { background: #ede9fe; color: #5b21b6; padding: 5px 8px; text-align: left; font-weight: 600; }
+    .obj-table td { padding: 4px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    .obj-table tr:last-child td { border-bottom: none; }
+    .obj-type-badge { display: inline-block; background: #e0e7ff; color: #3730a3; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600; }
+    #image-preview-area {
+      display: none;
+      padding: 8px 12px 4px;
+      background: #fafbfc;
+      border-top: 1px solid #e8eaf0;
+    }
+    #image-preview-wrap { position: relative; display: inline-block; }
+    #image-preview { max-height: 80px; max-width: 120px; border-radius: 8px; border: 2px solid #0a84ff; object-fit: cover; display: block; }
+    #remove-image-btn {
+      position: absolute; top: -7px; right: -7px;
+      width: 20px; height: 20px;
+      background: #e74c3c; color: white; border: none;
+      border-radius: 50%; cursor: pointer; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #image-label { font-size: 11px; color: #0a84ff; margin-top: 4px; font-weight: 600; }
+    .msg-image { max-width: 200px; max-height: 160px; border-radius: 8px; margin-bottom: 6px; display: block; object-fit: cover; border: 1px solid rgba(255,255,255,0.3); }
+    #chat-input-area {
+      padding: 10px;
+      border-top: 1px solid #e0e4ea;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      background: #fafbfc;
+    }
+    #upload-btn {
+      padding: 8px 11px; background: #f0f2f5; border: 1px solid #d0d5dc;
+      border-radius: 50%; cursor: pointer; font-size: 17px; flex-shrink: 0; line-height: 1; transition: background 0.15s;
+    }
+    #upload-btn:hover { background: #e2e5ea; }
+    #upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #chat-input {
+      flex: 1; padding: 9px 14px; border: 1px solid #d0d5dc; border-radius: 20px;
+      font-size: 13.5px; outline: none; resize: none; line-height: 1.5;
+      max-height: 120px; overflow-y: auto; font-family: inherit;
+    }
+    #chat-input:focus { border-color: #0a84ff; }
+    #send-btn {
+      padding: 9px 18px; background: #0a84ff; color: white; border: none;
+      border-radius: 20px; cursor: pointer; font-size: 13.5px; flex-shrink: 0; transition: background 0.15s;
+    }
+    #send-btn:hover { background: #0070d8; }
+    #send-btn:disabled { background: #aab; cursor: not-allowed; }
+    .typing-indicator { align-self: flex-start; background: #f1f3f6; border-radius: 14px; border-bottom-left-radius: 4px; padding: 9px 14px; color: #778; font-size: 13px; }
+    .typing-dot { display: inline-block; width: 6px; height: 6px; background: #999; border-radius: 50%; margin: 0 2px; animation: blink 1.2s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%, 60%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>◆ GeoGebra AI 도우미</h1>
+  <span>Powered by GPT-4o</span>
+</div>
+
+<div id="main">
+  <div id="ggb-panel"><div id="ggb-element"></div></div>
+
+  <div id="chat-panel">
+    <div id="chat-header">
+      <span class="dot"></span>
+      <span id="chat-header-title">AI 어시스턴트 (GPT-4o)</span>
+      <button id="analyze-btn" onclick="analyzeGgb()">🔍 현재 화면 분석</button>
+    </div>
+
+    <div id="chat-messages">
+      <div class="message assistant">
+        안녕하세요! GeoGebra AI 도우미입니다.<br><br>
+        • 질문을 입력하면 GeoGebra 명령어를 제안해 드려요.<br>
+        • <strong>▶ 적용</strong> 버튼으로 바로 그래프에 반영할 수 있어요.<br>
+        • <strong>🔍 현재 화면 분석</strong>으로 그려진 개체들을 AI가 분석해 드려요.<br>
+        • <strong>📷 버튼</strong>으로 수학 그림을 업로드하면 GeoGebra 명령어로 변환해 드려요!
+      </div>
+    </div>
+
+    <div id="image-preview-area">
+      <div id="image-preview-wrap">
+        <img id="image-preview" src="" alt="미리보기" />
+        <button id="remove-image-btn" onclick="removeImage()">✕</button>
+      </div>
+      <div id="image-label">📷 이미지 첨부됨 — 질문을 입력하거나 바로 전송하세요</div>
+    </div>
+
+    <div id="chat-input-area">
+      <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleImageUpload(this)" />
+      <button id="upload-btn" onclick="document.getElementById('file-input').click()" title="이미지 업로드">📷</button>
+      <textarea id="chat-input" placeholder="질문을 입력하세요 (Enter: 전송 / Shift+Enter: 줄바꿈)" rows="1"></textarea>
+      <button id="send-btn" onclick="sendMessage()">전송</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.geogebra.org/apps/deployggb.js"></script>
+<script>
+// ── GeoGebra 초기화 ──────────────────────────────────────────
+var ggbLoaded = false;
+function getGgbSize() {
+  var p = document.getElementById('ggb-panel');
+  return { w: p.clientWidth, h: p.clientHeight };
+}
+var sz = getGgbSize();
+var ggbParams = {
+  appName: 'suite',
+  width: sz.w || 800,
+  height: sz.h || 600,
+  showToolBar: true,
+  showAlgebraInput: true,
+  showMenuBar: true,
+  enableLabelDrags: true,
+  enableShiftDragZoom: true,
+  enableRightClick: true,
+  errorDialogsActive: false,
+  language: 'ko',
+  appletOnLoad: function() { ggbLoaded = true; }
+};
+var ggbApp = new GGBApplet(ggbParams, true);
+window.addEventListener('load', function() { ggbApp.inject('ggb-element'); });
+window.addEventListener('resize', function() {
+  if (!ggbLoaded || !window.ggbApplet) return;
+  var s = getGgbSize();
+  ggbApplet.setSize(s.w, s.h);
+});
+
+// ── GeoGebra 개체 수집 ───────────────────────────────────────
+function collectGgbObjects() {
+  if (!ggbLoaded || !window.ggbApplet) return null;
+  var names = ggbApplet.getAllObjectNames();
+  if (!names || names.length === 0) return [];
+  return names.map(function(n) {
+    var obj = {
+      name: n,
+      type: ggbApplet.getObjectType(n) || '',
+      definition: ggbApplet.getDefinitionString(n) || '',
+      value: ggbApplet.getValueString(n) || ''
+    };
+    if (obj.type === 'point') {
+      obj.x = ggbApplet.getXcoord(n);
+      obj.y = ggbApplet.getYcoord(n);
+    }
+    return obj;
+  });
+}
+
+function buildObjectsText(objects) {
+  return objects.map(function(o) {
+    var parts = ['이름: ' + o.name, '유형: ' + o.type];
+    if (o.definition) parts.push('정의: ' + o.definition);
+    if (o.value && o.value !== o.definition) parts.push('값: ' + o.value);
+    if (o.type === 'point') parts.push('좌표: (' + o.x.toFixed(3) + ', ' + o.y.toFixed(3) + ')');
+    return parts.join(' | ');
+  }).join('\n');
+}
+
+// ── AI 호출 (서버 경유) ───────────────────────────────────────
+function callAI(messages, maxTokens) {
+  return fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: messages, max_tokens: maxTokens || 1500 })
+  }).then(function(res) { return res.json(); });
+}
+
+// ── 현재 화면 분석 ────────────────────────────────────────────
+function analyzeGgb() {
+  if (!ggbLoaded || !window.ggbApplet) { alert('GeoGebra가 아직 로딩 중입니다.'); return; }
+  if (isLoading) return;
+  var objects = collectGgbObjects();
+  if (!objects || objects.length === 0) {
+    appendMessage('assistant', 'GeoGebra에 아직 그려진 개체가 없어요. 먼저 점, 선, 함수 등을 그려보세요!', false);
+    return;
+  }
+  showObjectsCard(objects);
+  var objText = buildObjectsText(objects);
+  var analysisPrompt =
+    '현재 GeoGebra 화면에 다음 수학적 개체들이 그려져 있습니다:\n\n' + objText +
+    '\n\n위 정보를 바탕으로 다음 세 가지를 분석해주세요:\n' +
+    '1. **개체 분석**: 각 개체의 수학적 의미와 주요 성질\n' +
+    '2. **전체 상황**: 이 개체들이 나타내는 수학적 개념이나 상황\n' +
+    '3. **제안**: 부족하거나 추가하면 좋을 것들 (GeoGebra 명령어 포함)\n\n' +
+    '추가 명령어는 [CMD]...[/CMD] 형식으로 제시해주세요.';
+  chatHistory.push({ role: 'user', content: analysisPrompt });
+  var typingEl = showTyping();
+  setLoading(true);
+  callAI(chatHistory)
+    .then(function(data) {
+      typingEl.remove();
+      if (data.error) { appendMessage('assistant', '오류: ' + data.error.message, false); return; }
+      var reply = data.choices[0].message.content;
+      chatHistory.push({ role: 'assistant', content: reply });
+      appendMessage('assistant', reply, true, true);
+    })
+    .catch(function() { typingEl.remove(); appendMessage('assistant', '서버 오류가 발생했습니다.', false); })
+    .finally(function() { setLoading(false); });
+}
+
+function showObjectsCard(objects) {
+  var container = document.getElementById('chat-messages');
+  var el = document.createElement('div');
+  el.className = 'message analysis';
+  var html = '<div class="analysis-badge">📋 현재 개체 목록</div>';
+  html += '<table class="obj-table"><tr><th>이름</th><th>유형</th><th>정의/값</th></tr>';
+  var typeMap = { point:'점', line:'직선', segment:'선분', circle:'원', conic:'이차곡선', function:'함수', polygon:'다각형', angle:'각도', vector:'벡터', numeric:'수' };
+  objects.forEach(function(o) {
+    var defVal = (o.type === 'point') ? '(' + o.x.toFixed(2) + ', ' + o.y.toFixed(2) + ')' : (o.definition || o.value || '-');
+    html += '<tr><td><strong>' + escHtml(o.name) + '</strong></td>'
+      + '<td><span class="obj-type-badge">' + (typeMap[o.type] || o.type) + '</span></td>'
+      + '<td>' + escHtml(defVal) + '</td></tr>';
+  });
+  html += '</table>';
+  el.innerHTML = html;
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+}
+
+// ── 채팅 ─────────────────────────────────────────────────────
+var chatHistory = [{
+  role: 'system',
+  content: [
+    '당신은 GeoGebra Suite 전문 수학 도우미입니다.',
+    'GeoGebra 명령어를 제안할 때는 반드시 [CMD]명령어[/CMD] 형식으로 작성하세요.',
+    '',
+    '올바른 명령어 예시:',
+    '- 점: [CMD]A = (2, 3)[/CMD]',
+    '- 원: [CMD]c = Circle((0,0), 3)[/CMD]',
+    '- 직선: [CMD]l = Line((0,0),(2,3))[/CMD]',
+    '- 선분: [CMD]Segment(A, B)[/CMD]',
+    '- 함수: [CMD]f(x) = x^2 - 2x + 1[/CMD]',
+    '- 다각형: [CMD]Polygon((0,0),(4,0),(2,3))[/CMD]',
+    '- 중점: [CMD]M = Midpoint(A, B)[/CMD]',
+    '- 접선: [CMD]Tangent(A, c)[/CMD]',
+    '- 교점: [CMD]Intersect(f, g)[/CMD]',
+    '- 벡터: [CMD]u = Vector((1,2))[/CMD]',
+    '',
+    '여러 명령어는 각각 별도의 [CMD]...[/CMD] 블록으로 작성하세요.',
+    '한국어로 친절하게 답변하세요.'
+  ].join('\n')
+}];
+
+var isLoading = false;
+var commands = [];
+var pendingImage = null;
+
+function setLoading(val) {
+  isLoading = val;
+  document.getElementById('send-btn').disabled = val;
+  document.getElementById('upload-btn').disabled = val;
+  document.getElementById('analyze-btn').disabled = val;
+}
+
+// 이미지 업로드
+function handleImageUpload(input) {
+  var file = input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { alert('이미지 파일만 업로드할 수 있습니다.'); return; }
+  if (file.size > 10 * 1024 * 1024) { alert('10MB 이하의 이미지만 업로드할 수 있습니다.'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var dataUrl = e.target.result;
+    pendingImage = { base64: dataUrl.split(',')[1], mimeType: file.type, dataUrl: dataUrl };
+    document.getElementById('image-preview').src = dataUrl;
+    document.getElementById('image-preview-area').style.display = 'block';
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImage() {
+  pendingImage = null;
+  document.getElementById('image-preview-area').style.display = 'none';
+  document.getElementById('image-preview').src = '';
+}
+
+var inputEl = document.getElementById('chat-input');
+inputEl.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+inputEl.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+function sendMessage() {
+  if (isLoading) return;
+  var text = inputEl.value.trim();
+  var hasImage = !!pendingImage;
+  if (!text && !hasImage) return;
+
+  var userContent;
+  if (hasImage) {
+    var imagePrompt = text ||
+      '이 수학 그림/그래프를 분석하고 GeoGebra Suite에서 그릴 수 있는 명령어를 [CMD]...[/CMD] 형식으로 제안해주세요.';
+    userContent = [
+      { type: 'image_url', image_url: { url: 'data:' + pendingImage.mimeType + ';base64,' + pendingImage.base64 } },
+      { type: 'text', text: imagePrompt }
+    ];
+    showImageMessage(pendingImage.dataUrl, text);
+  } else {
+    userContent = text;
+    appendMessage('user', text, false);
+  }
+
+  chatHistory.push({ role: 'user', content: userContent });
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  if (hasImage) removeImage();
+
+  var typingEl = showTyping();
+  setLoading(true);
+
+  callAI(chatHistory)
+    .then(function(data) {
+      typingEl.remove();
+      if (data.error) { appendMessage('assistant', '오류: ' + data.error.message, false); return; }
+      var reply = data.choices[0].message.content;
+      chatHistory.push({ role: 'assistant', content: reply });
+      appendMessage('assistant', reply, true, hasImage);
+    })
+    .catch(function() { typingEl.remove(); appendMessage('assistant', '서버 오류가 발생했습니다.', false); })
+    .finally(function() { setLoading(false); });
+}
+
+function showImageMessage(dataUrl, caption) {
+  var container = document.getElementById('chat-messages');
+  var el = document.createElement('div');
+  el.className = 'message user';
+  el.style.maxWidth = '75%';
+  el.innerHTML = '<img class="msg-image" src="' + dataUrl + '" alt="업로드 이미지" />'
+    + (caption ? '<div>' + escHtml(caption) + '</div>' : '');
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendMessage(role, content, parseCmd, isAnalysis) {
+  var container = document.getElementById('chat-messages');
+  var el = document.createElement('div');
+  el.className = 'message ' + role + (isAnalysis ? ' analysis' : '');
+  if (parseCmd) {
+    el.innerHTML = (isAnalysis ? '<div class="analysis-badge">🔍 AI 분석 결과</div>' : '') + renderMessage(content);
+  } else {
+    el.textContent = content;
+  }
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+  return el;
+}
+
+function renderMessage(text) {
+  var parts = text.split(/\[CMD\]([\s\S]*?)\[\/CMD\]/g);
+  var html = '';
+  for (var i = 0; i < parts.length; i++) {
+    if (i % 2 === 0) {
+      html += escHtml(parts[i]).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    } else {
+      var cmd = parts[i].trim();
+      var idx = commands.length;
+      commands.push(cmd);
+      html += '<div class="cmd-block"><code>' + escHtml(cmd) + '</code>'
+        + '<button class="apply-btn" onclick="applyCommand(this,' + idx + ')">&#9654; 적용</button></div>';
+    }
+  }
+  return html;
+}
+
+function applyCommand(btn, idx) {
+  var cmd = commands[idx];
+  if (!ggbLoaded || !window.ggbApplet) { alert('GeoGebra가 아직 로딩 중입니다.'); return; }
+  try {
+    var ok = ggbApplet.evalCommand(cmd);
+    if (ok !== false) {
+      btn.textContent = '✓ 적용됨'; btn.className = 'apply-btn applied'; btn.disabled = true;
+    } else {
+      btn.textContent = '✗ 오류'; btn.className = 'apply-btn error';
+      setTimeout(function() { btn.textContent = '▶ 적용'; btn.className = 'apply-btn'; }, 2000);
+    }
+  } catch(e) { console.error(e); }
+}
+
+function showTyping() {
+  var container = document.getElementById('chat-messages');
+  var el = document.createElement('div');
+  el.className = 'typing-indicator';
+  el.innerHTML = '답변 생성 중<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+  return el;
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
