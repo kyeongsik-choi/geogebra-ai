@@ -100,6 +100,33 @@
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 탭 바 (태블릿/모바일 전용) ── */
+    #tab-bar {
+      display: none;
+      background: #1a2a3a;
+      border-top: 1px solid #2e4a6e;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 0;
+      background: transparent;
+      color: #8bc;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      border-bottom: 3px solid transparent;
+      transition: all 0.15s;
+    }
+    .tab-btn.active {
+      color: white;
+      border-bottom-color: #0a84ff;
+      background: rgba(10,132,255,0.1);
+    }
+
+    /* ── 메인 레이아웃 ── */
     #main { display: flex; flex: 1; overflow: hidden; }
     #ggb-panel {
       flex: 6;
@@ -262,6 +289,81 @@
     .typing-dot:nth-child(2) { animation-delay: 0.2s; }
     .typing-dot:nth-child(3) { animation-delay: 0.4s; }
     @keyframes blink { 0%, 60%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
+
+    /* ════════════════════════════════
+       반응형: 태블릿 가로 (900~1200px)
+       ════════════════════════════════ */
+    @media (max-width: 1200px) and (min-width: 900px) {
+      #header { padding: 8px 12px; gap: 7px; }
+      #header h1 { font-size: 14px; }
+      #save-chat-btn, #clear-chat-btn, #capture-btn { padding: 5px 10px; font-size: 12px; }
+      #ggb-panel { flex: 55; }
+      #chat-panel { flex: 45; min-width: 280px; }
+    }
+
+    /* ════════════════════════════════
+       반응형: 태블릿 세로 / 작은 화면
+       (900px 미만 또는 portrait)
+       ════════════════════════════════ */
+    @media (max-width: 899px), (orientation: portrait) {
+      /* 헤더 압축 */
+      #header { padding: 7px 10px; gap: 6px; flex-wrap: wrap; }
+      #header h1 { font-size: 13px; width: 100%; }
+      #header > span { display: none; }
+      #save-chat-btn, #clear-chat-btn, #capture-btn {
+        padding: 5px 9px; font-size: 12px; flex: 1;
+        justify-content: center;
+      }
+
+      /* 탭 바 표시 */
+      #tab-bar { display: flex; }
+
+      /* 메인 영역을 세로 스택으로 */
+      #main { flex-direction: column; }
+
+      /* 패널 기본 — 탭으로 숨김/표시 */
+      #ggb-panel {
+        flex: none;
+        border-right: none;
+        border-bottom: 2px solid #d0d5dc;
+        transition: height 0.25s ease;
+      }
+      #chat-panel {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+        transition: height 0.25s ease;
+      }
+
+      /* 탭 활성 패널: 전체 높이 / 비활성: 숨김 */
+      #ggb-panel.tab-active   { height: 100%; }
+      #ggb-panel.tab-inactive { height: 0; overflow: hidden; border: none; }
+      #chat-panel.tab-active  { height: 100%; }
+      #chat-panel.tab-inactive{ height: 0; overflow: hidden; }
+
+      /* 채팅 입력창이 키보드에 가리지 않도록 */
+      #chat-input-area { padding-bottom: env(safe-area-inset-bottom, 10px); }
+
+      /* 분석 버튼 폰트 줄이기 */
+      #analyze-btn { font-size: 11px; padding: 4px 8px; }
+    }
+
+    /* ════════════════════════════════
+       태블릿 가로 landscape 보정
+       (가로가 더 길고 900px 이상이면
+        탭 숨기고 나란히 표시 유지)
+       ════════════════════════════════ */
+    @media (min-width: 900px) and (orientation: landscape) {
+      #tab-bar { display: none !important; }
+      #ggb-panel, #chat-panel {
+        height: 100% !important;
+        overflow: visible;
+      }
+      #ggb-panel.tab-inactive, #chat-panel.tab-inactive {
+        height: 100% !important;
+        overflow: visible;
+      }
+    }
   </style>
 </head>
 <body>
@@ -276,8 +378,13 @@
   <button id="capture-btn" onclick="captureApp()">📸 화면 저장</button>
 </div>
 
+<div id="tab-bar">
+  <button class="tab-btn active" id="tab-ggb" onclick="switchTab('ggb')">📐 GeoGebra</button>
+  <button class="tab-btn" id="tab-chat" onclick="switchTab('chat')">💬 AI 채팅</button>
+</div>
+
 <div id="main">
-  <div id="ggb-panel"><div id="ggb-element"></div></div>
+  <div id="ggb-panel" class="tab-active"><div id="ggb-element"></div></div>
 
   <div id="chat-panel">
     <div id="chat-header">
@@ -348,11 +455,62 @@ var ggbParams = {
   }
 };
 var ggbApp = new GGBApplet(ggbParams, true);
-// load 이벤트는 appendMessage 아래에서 한 번만 등록
-window.addEventListener('resize', function() {
+
+// ── GeoGebra 크기 자동 동기화 (ResizeObserver) ───────────────
+function syncGgbSize() {
   if (!ggbLoaded || !window.ggbApplet) return;
   var s = getGgbSize();
-  ggbApplet.setSize(s.w, s.h);
+  if (s.w > 0 && s.h > 0) ggbApplet.setSize(s.w, s.h);
+}
+// ResizeObserver: 패널 크기 바뀔 때마다 반응
+if (window.ResizeObserver) {
+  var ro = new ResizeObserver(function() { syncGgbSize(); });
+  window.addEventListener('load', function() {
+    ro.observe(document.getElementById('ggb-panel'));
+  });
+} else {
+  window.addEventListener('resize', syncGgbSize);
+}
+
+// ── 탭 전환 (태블릿/모바일) ──────────────────────────────────
+var currentTab = 'ggb';
+function switchTab(tab) {
+  currentTab = tab;
+  var ggbPanel  = document.getElementById('ggb-panel');
+  var chatPanel = document.getElementById('chat-panel');
+  var btnGgb    = document.getElementById('tab-ggb');
+  var btnChat   = document.getElementById('tab-chat');
+
+  if (tab === 'ggb') {
+    ggbPanel.className  = 'tab-active';
+    chatPanel.className = 'tab-inactive';
+    btnGgb.className    = 'tab-btn active';
+    btnChat.className   = 'tab-btn';
+    // GeoGebra 크기 재맞춤
+    setTimeout(syncGgbSize, 50);
+  } else {
+    ggbPanel.className  = 'tab-inactive';
+    chatPanel.className = 'tab-active';
+    btnGgb.className    = 'tab-btn';
+    btnChat.className   = 'tab-btn active';
+    // 채팅 스크롤 맨 아래로
+    var msgs = document.getElementById('chat-messages');
+    setTimeout(function() { msgs.scrollTop = msgs.scrollHeight; }, 50);
+  }
+}
+
+// 화면 회전 시 탭 초기화 (가로면 탭 불필요)
+window.addEventListener('orientationchange', function() {
+  setTimeout(function() {
+    var isLandscape = window.innerWidth > window.innerHeight;
+    if (isLandscape && window.innerWidth >= 900) {
+      document.getElementById('ggb-panel').className  = 'tab-active';
+      document.getElementById('chat-panel').className = 'tab-active';
+    } else {
+      switchTab(currentTab);
+    }
+    syncGgbSize();
+  }, 300);
 });
 
 // ── GeoGebra 개체 수집 ───────────────────────────────────────
