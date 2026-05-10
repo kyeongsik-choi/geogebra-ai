@@ -44,6 +44,38 @@
     }
     #capture-btn:hover { background: #d35400; }
     #capture-btn:disabled { background: #aaa; cursor: not-allowed; }
+    #save-chat-btn {
+      padding: 6px 14px;
+      background: #2980b9;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    #save-chat-btn:hover { background: #2471a3; }
+    #clear-chat-btn {
+      padding: 6px 14px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    #clear-chat-btn:hover { background: #545b62; }
+    /* localStorage 저장 표시 */
+    .save-indicator {
+      font-size: 10px;
+      color: #27ae60;
+      margin-left: 4px;
+      animation: fadeout 2s forwards;
+    }
+    @keyframes fadeout { 0%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
     /* 캡처 중 오버레이 */
     #capture-overlay {
       display: none;
@@ -239,6 +271,8 @@
 <div id="header">
   <h1>◆ GeoGebra AI 도우미</h1>
   <span>Powered by GPT-4o</span>
+  <button id="save-chat-btn" onclick="exportChat()">💾 대화 저장</button>
+  <button id="clear-chat-btn" onclick="clearChat()">🗑️ 초기화</button>
   <button id="capture-btn" onclick="captureApp()">📸 화면 저장</button>
 </div>
 
@@ -303,7 +337,7 @@ var ggbParams = {
   appletOnLoad: function() { ggbLoaded = true; }
 };
 var ggbApp = new GGBApplet(ggbParams, true);
-window.addEventListener('load', function() { ggbApp.inject('ggb-element'); });
+// load 이벤트는 appendMessage 아래에서 한 번만 등록
 window.addEventListener('resize', function() {
   if (!ggbLoaded || !window.ggbApplet) return;
   var s = getGgbSize();
@@ -429,6 +463,117 @@ var isLoading = false;
 var commands = [];
 var pendingImage = null;
 
+// ── 대화 저장 (localStorage) ─────────────────────────────────
+// 저장 형식: [{role, text, time}]  (이미지 제외 — 용량 절약)
+var savedMessages = [];
+
+function saveToLocal() {
+  try {
+    localStorage.setItem('ggb_chat', JSON.stringify(savedMessages));
+    localStorage.setItem('ggb_history', JSON.stringify(
+      chatHistory.filter(function(m) {
+        // system 메시지와 텍스트 메시지만 저장 (이미지 content 배열 제외)
+        return typeof m.content === 'string';
+      })
+    ));
+  } catch(e) { console.warn('localStorage 저장 실패:', e); }
+}
+
+function loadFromLocal() {
+  try {
+    var saved = localStorage.getItem('ggb_chat');
+    var savedHistory = localStorage.getItem('ggb_history');
+    if (!saved) return;
+
+    savedMessages = JSON.parse(saved);
+    if (savedHistory) {
+      var hist = JSON.parse(savedHistory);
+      // system 프롬프트는 현재 것 유지, 나머지 복원
+      hist.forEach(function(m) {
+        if (m.role !== 'system') chatHistory.push(m);
+      });
+    }
+
+    if (savedMessages.length === 0) return;
+
+    // UI 복원
+    var container = document.getElementById('chat-messages');
+    savedMessages.forEach(function(m) {
+      var el = document.createElement('div');
+      el.className = 'message ' + m.role;
+      if (m.role === 'assistant') {
+        el.innerHTML = renderMessage(m.text);
+      } else {
+        el.textContent = m.text;
+      }
+      container.appendChild(el);
+    });
+    container.scrollTop = container.scrollHeight;
+
+    // 복원 알림
+    var notice = document.createElement('div');
+    notice.style.cssText = 'text-align:center;font-size:11px;color:#888;padding:4px;';
+    notice.textContent = '✓ 이전 대화를 불러왔습니다 (' + savedMessages.length + '개 메시지)';
+    container.appendChild(notice);
+    container.scrollTop = container.scrollHeight;
+  } catch(e) { console.warn('localStorage 불러오기 실패:', e); }
+}
+
+// ── 대화 텍스트 파일로 내보내기 ──────────────────────────────
+function exportChat() {
+  if (savedMessages.length === 0) {
+    alert('저장할 대화 내용이 없습니다. 먼저 대화를 시작해보세요!');
+    return;
+  }
+  var lines = ['GeoGebra AI 도우미 대화 기록', '=' .repeat(40), ''];
+  savedMessages.forEach(function(m) {
+    var roleLabel = m.role === 'user' ? '👤 사용자' : '🤖 AI';
+    var time = m.time ? '[' + m.time + '] ' : '';
+    // [CMD]...[/CMD] 태그 제거해서 읽기 쉽게
+    var text = m.text.replace(/\[CMD\]([\s\S]*?)\[\/CMD\]/g, '▶ $1');
+    lines.push(time + roleLabel);
+    lines.push(text);
+    lines.push('');
+  });
+  lines.push('=' .repeat(40));
+  lines.push('저장 시각: ' + new Date().toLocaleString('ko-KR'));
+
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  var now = new Date();
+  var stamp = now.getFullYear() + '-'
+    + String(now.getMonth()+1).padStart(2,'0') + '-'
+    + String(now.getDate()).padStart(2,'0') + '_'
+    + String(now.getHours()).padStart(2,'0')
+    + String(now.getMinutes()).padStart(2,'0');
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'GeoGebra-AI_대화_' + stamp + '.txt';
+  link.click();
+}
+
+// ── 대화 초기화 ────────────────────────────────────────────────
+function clearChat() {
+  if (savedMessages.length === 0 || confirm('대화 내용을 모두 지울까요?')) {
+    savedMessages = [];
+    commands = [];
+    // chatHistory 시스템 프롬프트만 유지
+    chatHistory.splice(1);
+    localStorage.removeItem('ggb_chat');
+    localStorage.removeItem('ggb_history');
+
+    var container = document.getElementById('chat-messages');
+    container.innerHTML = '';
+    var el = document.createElement('div');
+    el.className = 'message assistant';
+    el.innerHTML = '안녕하세요! GeoGebra AI 도우미입니다.<br><br>'
+      + '• 질문을 입력하면 GeoGebra 명령어를 제안해 드려요.<br>'
+      + '• <strong>▶ 적용</strong> 버튼으로 바로 그래프에 반영할 수 있어요.<br>'
+      + '• <strong>🔍 현재 화면 분석</strong>으로 그려진 개체들을 AI가 분석해 드려요.<br>'
+      + '• <strong>📷 버튼</strong>으로 수학 그림을 업로드하면 GeoGebra 명령어로 변환해 드려요!';
+    container.appendChild(el);
+  }
+}
+
 function setLoading(val) {
   isLoading = val;
   document.getElementById('send-btn').disabled = val;
@@ -530,8 +675,23 @@ function appendMessage(role, content, parseCmd, isAnalysis) {
   }
   container.appendChild(el);
   container.scrollTop = container.scrollHeight;
+
+  // 이미지 메시지 제외하고 localStorage에 저장
+  if (role === 'user' || role === 'assistant') {
+    var now = new Date();
+    var timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    savedMessages.push({ role: role, text: content, time: timeStr });
+    saveToLocal();
+  }
+
   return el;
 }
+
+// 페이지 로드 시 이전 대화 복원
+window.addEventListener('load', function() {
+  ggbApp.inject('ggb-element');
+  loadFromLocal();
+});
 
 function renderMessage(text) {
   var parts = text.split(/\[CMD\]([\s\S]*?)\[\/CMD\]/g);
