@@ -334,7 +334,18 @@ var ggbParams = {
   enableRightClick: true,
   errorDialogsActive: false,
   language: 'ko',
-  appletOnLoad: function() { ggbLoaded = true; }
+  appletOnLoad: function() {
+    ggbLoaded = true;
+    // GeoGebra 변경 시 자동저장 등록 (디바운스 1초)
+    ggbApplet.registerUpdateListener('onGgbUpdate');
+    ggbApplet.registerAddListener('onGgbUpdate');
+    ggbApplet.registerRemoveListener('onGgbUpdate');
+    // 이전 GeoGebra 상태 복원
+    var savedGgb = localStorage.getItem('ggb_state');
+    if (savedGgb) {
+      try { ggbApplet.setBase64(savedGgb); } catch(e) {}
+    }
+  }
 };
 var ggbApp = new GGBApplet(ggbParams, true);
 // load 이벤트는 appendMessage 아래에서 한 번만 등록
@@ -463,6 +474,18 @@ var isLoading = false;
 var commands = [];
 var pendingImage = null;
 
+// ── GeoGebra 자동저장 (디바운스) ────────────────────────────
+var ggbSaveTimer = null;
+function onGgbUpdate() {
+  clearTimeout(ggbSaveTimer);
+  ggbSaveTimer = setTimeout(function() {
+    if (!ggbLoaded || !window.ggbApplet) return;
+    try {
+      localStorage.setItem('ggb_state', ggbApplet.getBase64());
+    } catch(e) { console.warn('GeoGebra 자동저장 실패:', e); }
+  }, 1000);
+}
+
 // ── 대화 저장 (localStorage) ─────────────────────────────────
 // 저장 형식: [{role, text, time}]  (이미지 제외 — 용량 절약)
 var savedMessages = [];
@@ -472,7 +495,6 @@ function saveToLocal() {
     localStorage.setItem('ggb_chat', JSON.stringify(savedMessages));
     localStorage.setItem('ggb_history', JSON.stringify(
       chatHistory.filter(function(m) {
-        // system 메시지와 텍스트 메시지만 저장 (이미지 content 배열 제외)
         return typeof m.content === 'string';
       })
     ));
@@ -519,58 +541,96 @@ function loadFromLocal() {
   } catch(e) { console.warn('localStorage 불러오기 실패:', e); }
 }
 
-// ── 대화 텍스트 파일로 내보내기 ──────────────────────────────
-function exportChat() {
-  if (savedMessages.length === 0) {
-    alert('저장할 대화 내용이 없습니다. 먼저 대화를 시작해보세요!');
-    return;
-  }
-  var lines = ['GeoGebra AI 도우미 대화 기록', '=' .repeat(40), ''];
-  savedMessages.forEach(function(m) {
-    var roleLabel = m.role === 'user' ? '👤 사용자' : '🤖 AI';
-    var time = m.time ? '[' + m.time + '] ' : '';
-    // [CMD]...[/CMD] 태그 제거해서 읽기 쉽게
-    var text = m.text.replace(/\[CMD\]([\s\S]*?)\[\/CMD\]/g, '▶ $1');
-    lines.push(time + roleLabel);
-    lines.push(text);
-    lines.push('');
-  });
-  lines.push('=' .repeat(40));
-  lines.push('저장 시각: ' + new Date().toLocaleString('ko-KR'));
-
-  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+// ── 타임스탬프 생성 ───────────────────────────────────────────
+function getStamp() {
   var now = new Date();
-  var stamp = now.getFullYear() + '-'
+  return now.getFullYear() + '-'
     + String(now.getMonth()+1).padStart(2,'0') + '-'
     + String(now.getDate()).padStart(2,'0') + '_'
     + String(now.getHours()).padStart(2,'0')
     + String(now.getMinutes()).padStart(2,'0');
-  var link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'GeoGebra-AI_대화_' + stamp + '.txt';
-  link.click();
 }
 
-// ── 대화 초기화 ────────────────────────────────────────────────
-function clearChat() {
-  if (savedMessages.length === 0 || confirm('대화 내용을 모두 지울까요?')) {
-    savedMessages = [];
-    commands = [];
-    // chatHistory 시스템 프롬프트만 유지
-    chatHistory.splice(1);
-    localStorage.removeItem('ggb_chat');
-    localStorage.removeItem('ggb_history');
+function downloadBlob(blob, filename) {
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  setTimeout(function() { URL.revokeObjectURL(link.href); }, 3000);
+}
 
-    var container = document.getElementById('chat-messages');
-    container.innerHTML = '';
-    var el = document.createElement('div');
-    el.className = 'message assistant';
-    el.innerHTML = '안녕하세요! GeoGebra AI 도우미입니다.<br><br>'
-      + '• 질문을 입력하면 GeoGebra 명령어를 제안해 드려요.<br>'
-      + '• <strong>▶ 적용</strong> 버튼으로 바로 그래프에 반영할 수 있어요.<br>'
-      + '• <strong>🔍 현재 화면 분석</strong>으로 그려진 개체들을 AI가 분석해 드려요.<br>'
-      + '• <strong>📷 버튼</strong>으로 수학 그림을 업로드하면 GeoGebra 명령어로 변환해 드려요!';
-    container.appendChild(el);
+// ── 대화(.txt) + GeoGebra(.ggb) 동시 저장 ────────────────────
+function exportChat() {
+  if (savedMessages.length === 0 && (!ggbLoaded || !window.ggbApplet)) {
+    alert('저장할 내용이 없습니다.');
+    return;
+  }
+
+  // 두 파일이 같은 타임스탬프를 공유
+  var stamp = getStamp();
+
+  // 1) 대화 텍스트 저장 (.txt)
+  if (savedMessages.length > 0) {
+    var lines = ['GeoGebra AI 도우미 대화 기록', '='.repeat(40), ''];
+    savedMessages.forEach(function(m) {
+      var roleLabel = m.role === 'user' ? '👤 사용자' : '🤖 AI';
+      var time = m.time ? '[' + m.time + '] ' : '';
+      var text = m.text.replace(/\[CMD\]([\s\S]*?)\[\/CMD\]/g, '▶ $1');
+      lines.push(time + roleLabel);
+      lines.push(text);
+      lines.push('');
+    });
+    lines.push('='.repeat(40));
+    lines.push('저장 시각: ' + new Date().toLocaleString('ko-KR'));
+    var txtBlob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    downloadBlob(txtBlob, 'GeoGebra-AI_대화_' + stamp + '.txt');
+  }
+
+  // 2) GeoGebra 파일 저장 (.ggb) — 100ms 딜레이로 브라우저 다운로드 충돌 방지
+  if (ggbLoaded && window.ggbApplet) {
+    setTimeout(function() {
+      try {
+        var b64 = ggbApplet.getBase64();
+        // base64 → Uint8Array → Blob
+        var binary = atob(b64);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        var ggbBlob = new Blob([bytes], { type: 'application/vnd.geogebra.file' });
+        downloadBlob(ggbBlob, 'GeoGebra-AI_그래프_' + stamp + '.ggb');
+      } catch(e) {
+        console.error('GeoGebra 파일 저장 오류:', e);
+        alert('GeoGebra 파일 저장 중 오류가 발생했습니다.');
+      }
+    }, 200);
+  }
+}
+
+// ── 대화 + GeoGebra 전체 초기화 ──────────────────────────────
+function clearChat() {
+  if (!confirm('대화 내용과 GeoGebra 그림을 모두 지울까요?')) return;
+
+  // 채팅 초기화
+  savedMessages = [];
+  commands = [];
+  chatHistory.splice(1);
+  localStorage.removeItem('ggb_chat');
+  localStorage.removeItem('ggb_history');
+
+  var container = document.getElementById('chat-messages');
+  container.innerHTML = '';
+  var el = document.createElement('div');
+  el.className = 'message assistant';
+  el.innerHTML = '안녕하세요! GeoGebra AI 도우미입니다.<br><br>'
+    + '• 질문을 입력하면 GeoGebra 명령어를 제안해 드려요.<br>'
+    + '• <strong>▶ 적용</strong> 버튼으로 바로 그래프에 반영할 수 있어요.<br>'
+    + '• <strong>🔍 현재 화면 분석</strong>으로 그려진 개체들을 AI가 분석해 드려요.<br>'
+    + '• <strong>📷 버튼</strong>으로 수학 그림을 업로드하면 GeoGebra 명령어로 변환해 드려요!';
+  container.appendChild(el);
+
+  // GeoGebra 초기화
+  if (ggbLoaded && window.ggbApplet) {
+    ggbApplet.newConstruction();
+    localStorage.removeItem('ggb_state');
   }
 }
 
