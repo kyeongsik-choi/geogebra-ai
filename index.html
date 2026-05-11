@@ -609,21 +609,37 @@ var chatHistory = [{
   role: 'system',
   content: [
     '당신은 GeoGebra Suite 전문 수학 도우미입니다.',
-    'GeoGebra 명령어를 제안할 때는 반드시 [CMD]명령어[/CMD] 형식으로 작성하세요.',
     '',
-    '올바른 명령어 예시:',
+    '【핵심 규칙 — 반드시 지켜야 합니다】',
+    '▶ GeoGebra 명령어는 반드시 명령어 하나당 [CMD]...[/CMD] 블록 하나를 사용하세요.',
+    '▶ 하나의 [CMD] 블록 안에 절대 여러 명령어를 넣지 마세요.',
+    '▶ 줄바꿈으로 여러 명령어를 묶지 마세요.',
+    '',
+    '✅ 올바른 예시 (명령어마다 별도 블록):',
+    '[CMD]A = (0, 0)[/CMD]',
+    '[CMD]B = (4, 0)[/CMD]',
+    '[CMD]C = (2, 3)[/CMD]',
+    '[CMD]Polygon(A, B, C)[/CMD]',
+    '',
+    '❌ 잘못된 예시 (여러 명령어를 하나의 블록에 넣으면 안 됨):',
+    '[CMD]A = (0, 0)',
+    'B = (4, 0)',
+    'Polygon(A, B)[/CMD]',
+    '',
+    '올바른 GeoGebra Suite 명령어 예시:',
     '- 점: [CMD]A = (2, 3)[/CMD]',
     '- 원: [CMD]c = Circle((0,0), 3)[/CMD]',
     '- 직선: [CMD]l = Line((0,0),(2,3))[/CMD]',
-    '- 선분: [CMD]Segment(A, B)[/CMD]',
+    '- 선분: [CMD]s = Segment(A, B)[/CMD]',
     '- 함수: [CMD]f(x) = x^2 - 2x + 1[/CMD]',
     '- 다각형: [CMD]Polygon((0,0),(4,0),(2,3))[/CMD]',
     '- 중점: [CMD]M = Midpoint(A, B)[/CMD]',
-    '- 접선: [CMD]Tangent(A, c)[/CMD]',
-    '- 교점: [CMD]Intersect(f, g)[/CMD]',
+    '- 접선: [CMD]t = Tangent(A, c)[/CMD]',
+    '- 교점: [CMD]P = Intersect(f, g)[/CMD]',
     '- 벡터: [CMD]u = Vector((1,2))[/CMD]',
+    '- 수선: [CMD]h = PerpendicularLine(A, l)[/CMD]',
+    '- 각도: [CMD]alpha = Angle(A, B, C)[/CMD]',
     '',
-    '여러 명령어는 각각 별도의 [CMD]...[/CMD] 블록으로 작성하세요.',
     '한국어로 친절하게 답변하세요.'
   ].join('\n')
 }];
@@ -916,13 +932,29 @@ function renderMessage(text) {
   var html = '';
   for (var i = 0; i < parts.length; i++) {
     if (i % 2 === 0) {
-      html += escHtml(parts[i]).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+      // 일반 텍스트
+      html += escHtml(parts[i])
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
     } else {
-      var cmd = parts[i].trim();
-      var idx = commands.length;
-      commands.push(cmd);
-      html += '<div class="cmd-block"><code>' + escHtml(cmd) + '</code>'
-        + '<button class="apply-btn" onclick="applyCommand(this,' + idx + ')">&#9654; 적용</button></div>';
+      // CMD 블록 — 줄바꿈/세미콜론으로 여러 명령어가 묶여 있어도 자동 분리
+      var rawBlock = parts[i];
+      var cmdLines = rawBlock
+        .split(/\n|;/)                         // 줄바꿈 또는 세미콜론으로 분리
+        .map(function(l) { return l.trim(); })
+        .filter(function(l) {
+          // 빈 줄, 주석(//), 설명 텍스트 제외
+          return l.length > 0 && !l.startsWith('//') && !l.startsWith('#');
+        });
+
+      cmdLines.forEach(function(cmd) {
+        var idx = commands.length;
+        commands.push(cmd);
+        html += '<div class="cmd-block">'
+          + '<code>' + escHtml(cmd) + '</code>'
+          + '<button class="apply-btn" onclick="applyCommand(this,' + idx + ')">&#9654; 적용</button>'
+          + '</div>';
+      });
     }
   }
   return html;
