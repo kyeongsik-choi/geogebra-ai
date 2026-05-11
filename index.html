@@ -733,10 +733,25 @@ function callAI(messages, maxTokens) {
     });
   }
 
+  // 마지막 사용자 메시지에 한국어 응답 강제 리마인더 추가
+  var finalMessages = augmented.map(function(msg, idx) {
+    if (idx === augmented.length - 1 && msg.role === 'user') {
+      var originalContent = msg.content;
+      if (typeof originalContent === 'string') {
+        return { role: 'user', content: originalContent + '\n\n[반드시 한국어로만 답변하세요. No English.]' };
+      } else if (Array.isArray(originalContent)) {
+        var newContent = originalContent.slice();
+        newContent.push({ type: 'text', text: '\n\n[반드시 한국어로만 답변하세요. No English.]' });
+        return { role: 'user', content: newContent };
+      }
+    }
+    return msg;
+  });
+
   return fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages: augmented, max_tokens: maxTokens || 1500 })
+    body: JSON.stringify({ messages: finalMessages, max_tokens: maxTokens || 1500 })
   }).then(function(res) { return res.json(); });
 }
 
@@ -800,6 +815,8 @@ function showObjectsCard(objects) {
 var chatHistory = [{
   role: 'system',
   content: [
+    '🚨 [언어 규칙 — 절대 원칙] 모든 답변은 반드시 한국어로만 작성하세요. 영어 사용 금지. You MUST respond in Korean only. Never use English in your responses.',
+    '',
     '당신은 GeoGebra Suite 전문 수학 도우미입니다.',
     '',
     '【핵심 규칙 — 반드시 지켜야 합니다】',
@@ -832,7 +849,7 @@ var chatHistory = [{
     '- 수선: [CMD]h = PerpendicularLine(A, l)[/CMD]',
     '- 각도: [CMD]alpha = Angle(A, B, C)[/CMD]',
     '',
-    '한국어로 친절하게 답변하세요.'
+    '⚠️ 최종 언어 규칙: 위 내용을 포함하여 모든 답변은 반드시 한국어로만 작성하세요. 영어로 답변하는 것은 절대 금지입니다. 이미지나 수식을 분석할 때도 반드시 한국어로 설명하세요.'
   ].join('\n')
 }];
 
