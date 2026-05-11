@@ -8,9 +8,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <!-- KaTeX: LaTeX 수식 렌더링 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
-    onload="window.katexReady = true;"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -1300,18 +1298,40 @@ function showImageMessage(dataUrl, caption) {
   container.scrollTop = container.scrollHeight;
 }
 
-function renderKatex(el) {
-  if (window.renderMathInElement) {
-    renderMathInElement(el, {
-      delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '$',  right: '$',  display: false },
-        { left: '\\[', right: '\\]', display: true },
-        { left: '\\(', right: '\\)', display: false }
-      ],
-      throwOnError: false
-    });
+// $...$ / $$...$$ 수식을 katex.renderToString으로 직접 렌더링
+function renderTextWithLatex(text) {
+  var result = '';
+  // $$...$$와 $...$를 순서대로 분리 (display 먼저)
+  var pattern = /(\$\$[\s\S]*?\$\$|\$[^\n$]+?\$)/g;
+  var lastIdx = 0;
+  var m;
+  while ((m = pattern.exec(text)) !== null) {
+    // 수식 앞 일반 텍스트
+    var plain = text.slice(lastIdx, m.index);
+    result += escHtml(plain)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+    // 수식 렌더링
+    var raw = m[0];
+    var isDisplay = raw.startsWith('$$');
+    var latex = isDisplay ? raw.slice(2, -2).trim() : raw.slice(1, -1).trim();
+    try {
+      result += window.katex
+        ? window.katex.renderToString(latex, { displayMode: isDisplay, throwOnError: false })
+        : escHtml(raw);
+    } catch(e) {
+      result += escHtml(raw);
+    }
+    lastIdx = m.index + m[0].length;
   }
+  // 나머지 일반 텍스트
+  var tail = text.slice(lastIdx);
+  result += escHtml(tail)
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  return result;
 }
 
 function appendMessage(role, content, parseCmd, isAnalysis) {
@@ -1320,7 +1340,6 @@ function appendMessage(role, content, parseCmd, isAnalysis) {
   el.className = 'message ' + role + (isAnalysis ? ' analysis' : '');
   if (parseCmd) {
     el.innerHTML = (isAnalysis ? '<div class="analysis-badge">🔍 AI 분석 결과</div>' : '') + renderMessage(content);
-    renderKatex(el);
   } else {
     el.textContent = content;
   }
@@ -1358,25 +1377,8 @@ function renderMessage(text) {
   var html = '';
   for (var i = 0; i < parts.length; i++) {
     if (i % 2 === 0) {
-      // 일반 텍스트 — LaTeX 수식($...$ 또는 $$...$$)은 escHtml 처리 제외
-      var textPart = parts[i];
-      // $$...$$와 $...$를 임시 플레이스홀더로 치환 후 escHtml, 이후 복원
-      var mathBlocks = [];
-      textPart = textPart.replace(/\$\$([\s\S]*?)\$\$/g, function(m) {
-        mathBlocks.push(m); return '\x00MATH' + (mathBlocks.length - 1) + '\x00';
-      });
-      textPart = textPart.replace(/\$([^\n$]+?)\$/g, function(m) {
-        mathBlocks.push(m); return '\x00MATH' + (mathBlocks.length - 1) + '\x00';
-      });
-      textPart = escHtml(textPart)
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/\n/g, '<br>');
-      // 플레이스홀더를 원래 수식으로 복원
-      textPart = textPart.replace(/\x00MATH(\d+)\x00/g, function(m, idx) {
-        return mathBlocks[parseInt(idx)];
-      });
-      html += textPart;
+      // 일반 텍스트 — $...$ / $$...$$ LaTeX 수식은 katex.renderToString으로 직접 렌더링
+      html += renderTextWithLatex(parts[i]);
     } else {
       // CMD 블록 — 줄바꿈/세미콜론으로 여러 명령어가 묶여 있어도 자동 분리
       var rawBlock = parts[i];
