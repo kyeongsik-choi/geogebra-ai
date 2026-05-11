@@ -1351,6 +1351,8 @@ function renderMessage(text) {
         });
 
       cmdLines.forEach(function(cmd) {
+        // 명령어 이름과 괄호 사이 공백 제거: Circle (A,B) → Circle(A,B)
+        cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\(/g, '$1(');
         var idx = commands.length;
         commands.push(cmd);
         html += '<div class="cmd-block">'
@@ -1365,6 +1367,8 @@ function renderMessage(text) {
 
 function applyCommand(btn, idx) {
   var cmd = commands[idx];
+  // 명령어 이름과 괄호 사이 공백 제거 (최종 안전장치)
+  cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\(/g, '$1(');
   if (!ggbLoaded || !window.ggbApplet) { alert('GeoGebra가 아직 로딩 중입니다.'); return; }
   try {
     var ok = ggbApplet.evalCommand(cmd);
