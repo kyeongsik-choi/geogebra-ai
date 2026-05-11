@@ -192,6 +192,18 @@
     }
     .message.user { align-self: flex-end; background: #0a84ff; color: white; border-bottom-right-radius: 4px; }
     .message.assistant { align-self: flex-start; background: #f1f3f6; color: #222; border-bottom-left-radius: 4px; }
+    .message.notice {
+      align-self: center;
+      background: #fffbea;
+      border: 1px solid #f6c90e;
+      border-radius: 10px;
+      color: #555;
+      font-size: 0.88em;
+      line-height: 1.7;
+      max-width: 97%;
+      padding: 12px 16px;
+      margin: 4px 0 8px;
+    }
     .message.analysis {
       align-self: flex-start;
       background: #f5f0ff;
@@ -1326,7 +1338,20 @@ function appendMessage(role, content, parseCmd, isAnalysis) {
 window.addEventListener('load', function() {
   ggbApp.inject('ggb-element');
   loadFromLocal();
+  showNotice();
 });
+
+function showNotice() {
+  var container = document.getElementById('chat-messages');
+  var el = document.createElement('div');
+  el.className = 'message notice';
+  el.innerHTML =
+    '<span style="font-size:1.1em;">👋</span> 안녕하세요! <strong>GeoGebra AI 도우미</strong>입니다.<br><br>' +
+    '⚠️ <strong>주의:</strong> AI가 제안하는 GeoGebra 명령어는 <strong>틀릴 수 있습니다.</strong><br>' +
+    '▶ 적용 버튼을 누르기 전에 명령어를 꼭 확인해 주세요.<br>' +
+    '오류가 생기면 <strong>지우기</strong> 버튼으로 초기화할 수 있습니다.';
+  container.appendChild(el);
+}
 
 function renderMessage(text) {
   // AI가 [CMD] 대신 마크다운 코드블록(```geogebra 또는 ```)을 쓸 경우 자동 변환
