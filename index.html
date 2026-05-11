@@ -768,15 +768,20 @@ function analyzeGgb() {
   var objText = buildObjectsText(objects);
   var analysisPrompt =
     '현재 GeoGebra 화면에 다음 수학적 개체들이 그려져 있습니다:\n\n' + objText +
-    '\n\n위 정보를 바탕으로 다음 세 가지를 분석해주세요:\n' +
+    '\n\n위 정보를 바탕으로 다음 세 가지를 한국어로 분석해주세요:\n' +
     '1. **개체 분석**: 각 개체의 수학적 의미와 주요 성질\n' +
     '2. **전체 상황**: 이 개체들이 나타내는 수학적 개념이나 상황\n' +
-    '3. **제안**: 부족하거나 추가하면 좋을 것들 (GeoGebra 명령어 포함)\n\n' +
-    '추가 명령어는 [CMD]...[/CMD] 형식으로 제시해주세요.';
+    '3. **추가 제안**: 부족하거나 추가하면 좋을 것들\n\n' +
+    '⚠️ GeoGebra 명령어를 제시할 때는 반드시 명령어 하나마다 [CMD]...[/CMD] 블록을 따로 사용하세요.\n' +
+    '예시:\n' +
+    '[CMD]M = Midpoint(A, B)[/CMD]\n' +
+    '[CMD]c = Circle(A, B)[/CMD]\n' +
+    '[CMD]l = PerpendicularLine(M, Segment(A,B))[/CMD]\n' +
+    '절대로 하나의 [CMD] 블록 안에 여러 명령어를 넣지 마세요.';
   chatHistory.push({ role: 'user', content: analysisPrompt });
   var typingEl = showTyping();
   setLoading(true);
-  callAI(chatHistory)
+  callAI(chatHistory, 2500)
     .then(function(data) {
       typingEl.remove();
       if (data.error) { appendMessage('assistant', '오류: ' + data.error.message, false); return; }
@@ -1317,6 +1322,15 @@ window.addEventListener('load', function() {
 });
 
 function renderMessage(text) {
+  // AI가 [CMD] 대신 마크다운 코드블록(```geogebra 또는 ```)을 쓸 경우 자동 변환
+  text = text.replace(/```(?:geogebra|ggb|GeoGebra)?\s*([\s\S]*?)```/g, function(match, code) {
+    var lines = code.trim().split('\n');
+    return lines.map(function(l) {
+      l = l.trim();
+      return l ? '[CMD]' + l + '[/CMD]' : '';
+    }).filter(Boolean).join('\n');
+  });
+
   var parts = text.split(/\[CMD\]([\s\S]*?)\[\/CMD\]/g);
   var html = '';
   for (var i = 0; i < parts.length; i++) {
@@ -1324,15 +1338,15 @@ function renderMessage(text) {
       // 일반 텍스트
       html += escHtml(parts[i])
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/\n/g, '<br>');
     } else {
       // CMD 블록 — 줄바꿈/세미콜론으로 여러 명령어가 묶여 있어도 자동 분리
       var rawBlock = parts[i];
       var cmdLines = rawBlock
-        .split(/\n|;/)                         // 줄바꿈 또는 세미콜론으로 분리
+        .split(/\n|;/)
         .map(function(l) { return l.trim(); })
         .filter(function(l) {
-          // 빈 줄, 주석(//), 설명 텍스트 제외
           return l.length > 0 && !l.startsWith('//') && !l.startsWith('#');
         });
 
