@@ -6,9 +6,6 @@
   <title>GeoGebra AI 도우미</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <!-- KaTeX: LaTeX 수식 렌더링 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -857,9 +854,6 @@ var chatHistory = [{
     '- 수선: [CMD]h = PerpendicularLine(A, l)[/CMD]',
     '- 각도: [CMD]alpha = Angle(A, B, C)[/CMD]',
     '',
-    '수식 표현 규칙: 수학 수식은 반드시 LaTeX 형식으로 작성하세요. 인라인 수식은 $수식$, 별도 줄 수식은 $$수식$$으로 표기하세요.',
-    '예: 이차방정식의 근의 공식은 $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$ 입니다.',
-    '',
     '⚠️ 최종 언어 규칙: 위 내용을 포함하여 모든 답변은 반드시 한국어로만 작성하세요. 영어로 답변하는 것은 절대 금지입니다. 이미지나 수식을 분석할 때도 반드시 한국어로 설명하세요.'
   ].join('\n')
 }];
@@ -1298,41 +1292,6 @@ function showImageMessage(dataUrl, caption) {
   container.scrollTop = container.scrollHeight;
 }
 
-// $...$ / $$...$$ 수식을 katex.renderToString으로 직접 렌더링
-function renderTextWithLatex(text) {
-  var result = '';
-  // $$...$$와 $...$를 순서대로 분리 (display 먼저)
-  var pattern = /(\$\$[\s\S]*?\$\$|\$[^\n$]+?\$)/g;
-  var lastIdx = 0;
-  var m;
-  while ((m = pattern.exec(text)) !== null) {
-    // 수식 앞 일반 텍스트
-    var plain = text.slice(lastIdx, m.index);
-    result += escHtml(plain)
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\n/g, '<br>');
-    // 수식 렌더링
-    var raw = m[0];
-    var isDisplay = raw.startsWith('$$');
-    var latex = isDisplay ? raw.slice(2, -2).trim() : raw.slice(1, -1).trim();
-    try {
-      result += window.katex
-        ? window.katex.renderToString(latex, { displayMode: isDisplay, throwOnError: false })
-        : escHtml(raw);
-    } catch(e) {
-      result += escHtml(raw);
-    }
-    lastIdx = m.index + m[0].length;
-  }
-  // 나머지 일반 텍스트
-  var tail = text.slice(lastIdx);
-  result += escHtml(tail)
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br>');
-  return result;
-}
 
 function appendMessage(role, content, parseCmd, isAnalysis) {
   var container = document.getElementById('chat-messages');
@@ -1377,8 +1336,11 @@ function renderMessage(text) {
   var html = '';
   for (var i = 0; i < parts.length; i++) {
     if (i % 2 === 0) {
-      // 일반 텍스트 — $...$ / $$...$$ LaTeX 수식은 katex.renderToString으로 직접 렌더링
-      html += renderTextWithLatex(parts[i]);
+      // 일반 텍스트
+      html += escHtml(parts[i])
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
     } else {
       // CMD 블록 — 줄바꿈/세미콜론으로 여러 명령어가 묶여 있어도 자동 분리
       var rawBlock = parts[i];
