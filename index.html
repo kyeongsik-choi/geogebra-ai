@@ -1351,8 +1351,12 @@ function renderMessage(text) {
         });
 
       cmdLines.forEach(function(cmd) {
-        // 명령어 이름과 괄호 사이 공백 제거: Circle (A,B) → Circle(A,B)
+        // 명령어 이름과 둥근괄호 사이 공백 제거: Circle (A,B) → Circle(A,B)
         cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\(/g, '$1(');
+        // 명령어 이름과 대괄호 사이 공백 제거: TrigCombine [expr] → TrigCombine[expr]
+        cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\[/g, '$1[');
+        // 함수 결과와 다음 함수 사이 암묵적 곱셈: sin(x) cos(3x) → sin(x)*cos(3x)
+        cmd = cmd.replace(/\)\s+([A-Za-z])/g, ')*$1');
         var idx = commands.length;
         commands.push(cmd);
         html += '<div class="cmd-block">'
@@ -1369,6 +1373,8 @@ function applyCommand(btn, idx) {
   var cmd = commands[idx];
   // 명령어 이름과 괄호 사이 공백 제거 (최종 안전장치)
   cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\(/g, '$1(');
+  cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\[/g, '$1[');
+  cmd = cmd.replace(/\)\s+([A-Za-z])/g, ')*$1');
   if (!ggbLoaded || !window.ggbApplet) { alert('GeoGebra가 아직 로딩 중입니다.'); return; }
   try {
     var ok = ggbApplet.evalCommand(cmd);
