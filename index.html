@@ -769,7 +769,11 @@ function analyzeGgb() {
       chatHistory.push({ role: 'assistant', content: reply });
       appendMessage('assistant', reply, true, true);
     })
-    .catch(function() { typingEl.remove(); appendMessage('assistant', '서버 오류가 발생했습니다.', false); })
+    .catch(function(err) {
+      typingEl.remove();
+      console.error('AI 호출 오류:', err);
+      appendMessage('assistant', '오류가 발생했습니다: ' + (err.message || '네트워크 연결을 확인해주세요.'), false);
+    })
     .finally(function() { setLoading(false); });
 }
 
@@ -1241,12 +1245,17 @@ function sendMessage() {
       if (data.error) { appendMessage('assistant', '오류: ' + data.error.message, false); return; }
       var reply = data.choices[0].message.content;
       chatHistory.push({ role: 'assistant', content: reply });
-      // 교재 참조 배지 붙이기
-      var bookBadge = (bookText && findRelevantSections(lastUserMsg || '', 100))
+      // 교재 참조 배지 — text는 sendMessage() 스코프에서 접근 가능
+      var queryForBadge = text || (hasImage ? '이미지 분석' : '');
+      var bookBadge = (bookText && queryForBadge && findRelevantSections(queryForBadge, 100))
         ? '<span class="book-ref-badge">📚 교재 참조</span>' : '';
       appendMessage('assistant', bookBadge + reply, true, hasImage);
     })
-    .catch(function() { typingEl.remove(); appendMessage('assistant', '서버 오류가 발생했습니다.', false); })
+    .catch(function(err) {
+      typingEl.remove();
+      console.error('AI 호출 오류:', err);
+      appendMessage('assistant', '오류가 발생했습니다: ' + (err.message || '네트워크 연결을 확인해주세요.'), false);
+    })
     .finally(function() { setLoading(false); });
 }
 
