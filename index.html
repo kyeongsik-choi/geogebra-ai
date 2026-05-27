@@ -1419,7 +1419,7 @@ function renderMessage(text) {
         html += '<div class="cmd-block">'
           + '<input class="cmd-input" type="text" value="' + escAttr(cmd) + '"'
           + ' oninput="updateCommand(this,' + idx + ')"'
-          + ' onkeydown="if(event.key===\'Enter\'){applyCommand(this.nextElementSibling,' + idx + ');}"'
+          + ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();event.stopPropagation();applyCommand(this.parentElement.querySelector(\'.apply-btn\'),' + idx + ');}"'
           + ' title="편집 후 Enter 또는 ▶ 적용">'
           + '<button class="apply-btn" onclick="applyCommand(this,' + idx + ')">&#9654; 적용</button>'
           + '</div>';
