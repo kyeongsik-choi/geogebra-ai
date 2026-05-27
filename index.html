@@ -1419,7 +1419,8 @@ function renderMessage(text) {
         html += '<div class="cmd-block">'
           + '<input class="cmd-input" type="text" value="' + escAttr(cmd) + '"'
           + ' oninput="updateCommand(this,' + idx + ')"'
-          + ' title="클릭하여 편집 가능">'
+          + ' onkeydown="if(event.key===\'Enter\'){applyCommand(this.nextElementSibling,' + idx + ');}"'
+          + ' title="편집 후 Enter 또는 ▶ 적용">'
           + '<button class="apply-btn" onclick="applyCommand(this,' + idx + ')">&#9654; 적용</button>'
           + '</div>';
       });
@@ -1444,6 +1445,9 @@ function applyCommand(btn, idx) {
     var ok = ggbApplet.evalCommand(cmd);
     if (ok !== false) {
       btn.textContent = '✓ 적용됨'; btn.className = 'apply-btn applied'; btn.disabled = true;
+      setTimeout(function() {
+        btn.textContent = '▶ 적용'; btn.className = 'apply-btn'; btn.disabled = false;
+      }, 3000);
     } else {
       btn.textContent = '✗ 오류'; btn.className = 'apply-btn error';
       setTimeout(function() { btn.textContent = '▶ 적용'; btn.className = 'apply-btn'; }, 2000);
