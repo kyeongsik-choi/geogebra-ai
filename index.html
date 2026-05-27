@@ -1506,13 +1506,15 @@ function is3DCommand(cmd) {
   return /\b(Surface|Plane|Sphere|Cone|Cylinder|Pyramid|Prism|Tetrahedron|Cube|Octahedron|Icosahedron|Dodecahedron|Net|Quadric|IntersectConic|Bottom|Top|Side|Volume|Height3D)\s*\(/i.test(cmd);
 }
 
-// GeoGebra 2D/3D 화면 전환
+// GeoGebra 2D/3D 화면 전환 (대수 패널 포함)
 function switchPerspective(mode) {
   if (!ggbLoaded || !window.ggbApplet) { alert('GeoGebra가 아직 로딩 중입니다.'); return; }
   if (mode === '3d') {
-    ggbApplet.setPerspective('T');  // 3D 그래픽스
+    // A = 대수 패널, T = 3D 그래픽스
+    ggbApplet.setPerspective('AT');
   } else {
-    ggbApplet.setPerspective('G');  // 2D 그래픽스
+    // A = 대수 패널, G = 2D 그래픽스
+    ggbApplet.setPerspective('AG');
   }
 }
 
