@@ -1404,6 +1404,8 @@ function renderMessage(text) {
         });
 
       cmdLines.forEach(function(cmd) {
+        // LaTeX 코드 → GeoGebra 문법 변환
+        cmd = cleanLatex(cmd);
         // 명령어 이름과 둥근괄호 사이 공백 제거: Circle (A,B) → Circle(A,B)
         cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\(/g, '$1(');
         // 명령어 이름과 대괄호 사이 공백 제거: TrigCombine [expr] → TrigCombine[expr]
@@ -1428,11 +1430,13 @@ function applyCommand(btn, idx) {
   // input에서 직접 최신 값 읽기 (편집된 내용 반영)
   var input = btn.parentElement.querySelector('.cmd-input');
   var cmd = input ? input.value : commands[idx];
-  commands[idx] = cmd; // 배열도 동기화
-  // 명령어 이름과 괄호 사이 공백 제거 (최종 안전장치)
+  // LaTeX 잔재 및 공백 정리 (최종 안전장치)
+  cmd = cleanLatex(cmd);
   cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\(/g, '$1(');
   cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\[/g, '$1[');
   cmd = cmd.replace(/\)\s+([A-Za-z])/g, ')*$1');
+  commands[idx] = cmd;
+  if (input) input.value = cmd; // input에도 정리된 값 반영
   if (!ggbLoaded || !window.ggbApplet) { alert('GeoGebra가 아직 로딩 중입니다.'); return; }
   try {
     var ok = ggbApplet.evalCommand(cmd);
@@ -1482,6 +1486,52 @@ function renderTextWithLatex(text) {
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/\n/g, '<br>');
   return result;
+}
+
+// LaTeX 코드 → GeoGebra 문법 변환
+function cleanLatex(cmd) {
+  return cmd
+    // 연산자
+    .replace(/\\cdot/g, '*')
+    .replace(/\\times/g, '*')
+    .replace(/\\div/g, '/')
+    .replace(/\\pm/g, '+')
+    // 함수
+    .replace(/\\sin/g, 'sin')
+    .replace(/\\cos/g, 'cos')
+    .replace(/\\tan/g, 'tan')
+    .replace(/\\arcsin/g, 'asin')
+    .replace(/\\arccos/g, 'acos')
+    .replace(/\\arctan/g, 'atan')
+    .replace(/\\ln/g, 'ln')
+    .replace(/\\log/g, 'log')
+    .replace(/\\exp/g, 'exp')
+    .replace(/\\abs/g, 'abs')
+    // sqrt, frac (중괄호 포함)
+    .replace(/\\sqrt\{([^}]*)\}/g, 'sqrt($1)')
+    .replace(/\\sqrt/g, 'sqrt')
+    .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '($1)/($2)')
+    // 괄호
+    .replace(/\\left\(/g, '(').replace(/\\right\)/g, ')')
+    .replace(/\\left\[/g, '[').replace(/\\right\]/g, ']')
+    .replace(/\\left\{/g, '(').replace(/\\right\}/g, ')')
+    .replace(/\\left/g, '').replace(/\\right/g, '')
+    // 상수·그리스 문자
+    .replace(/\\pi/g, 'pi')
+    .replace(/\\infty/g, 'infinity')
+    .replace(/\\alpha/g, 'α')
+    .replace(/\\beta/g, 'β')
+    .replace(/\\gamma/g, 'γ')
+    .replace(/\\delta/g, 'δ')
+    .replace(/\\theta/g, 'θ')
+    .replace(/\\phi/g, 'φ')
+    .replace(/\\lambda/g, 'λ')
+    .replace(/\\mu/g, 'μ')
+    .replace(/\\sigma/g, 'σ')
+    .replace(/\\omega/g, 'ω')
+    // 나머지 백슬래시 명령어 및 중괄호 제거
+    .replace(/\\[a-zA-Z]+/g, '')
+    .replace(/[{}]/g, '');
 }
 
 // 명령어 편집 시 commands 배열 업데이트
