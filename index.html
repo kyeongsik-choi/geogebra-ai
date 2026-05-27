@@ -1498,7 +1498,9 @@ function renderTextWithLatex(text) {
 // LaTeX 코드 → GeoGebra 문법 변환
 function cleanLatex(cmd) {
   return cmd
-    // 연산자
+    // 연산자 (백슬래시 이스케이프 포함)
+    .replace(/\\\*/g, '*')
+    .replace(/\\\//g, '/')
     .replace(/\\cdot/g, '*')
     .replace(/\\times/g, '*')
     .replace(/\\div/g, '/')
