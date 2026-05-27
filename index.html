@@ -237,6 +237,24 @@
       gap: 8px;
     }
     .cmd-block code { flex: 1; word-break: break-all; }
+    .cmd-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 1px dashed #4a7aaa;
+      color: #79c0ff;
+      font-family: 'Consolas', 'Menlo', monospace;
+      font-size: 12.5px;
+      outline: none;
+      padding: 2px 4px;
+      width: 0;
+      min-width: 0;
+    }
+    .cmd-input:focus {
+      border-bottom: 1px solid #79c0ff;
+      background: rgba(121,192,255,0.07);
+      border-radius: 3px 3px 0 0;
+    }
     .apply-btn {
       background: #238636;
       color: white;
@@ -1389,7 +1407,9 @@ function renderMessage(text) {
         var idx = commands.length;
         commands.push(cmd);
         html += '<div class="cmd-block">'
-          + '<code>' + escHtml(cmd) + '</code>'
+          + '<input class="cmd-input" type="text" value="' + escAttr(cmd) + '"'
+          + ' oninput="updateCommand(this,' + idx + ')"'
+          + ' title="클릭하여 편집 가능">'
           + '<button class="apply-btn" onclick="applyCommand(this,' + idx + ')">&#9654; 적용</button>'
           + '</div>';
       });
@@ -1399,7 +1419,10 @@ function renderMessage(text) {
 }
 
 function applyCommand(btn, idx) {
-  var cmd = commands[idx];
+  // input에서 직접 최신 값 읽기 (편집된 내용 반영)
+  var input = btn.parentElement.querySelector('.cmd-input');
+  var cmd = input ? input.value : commands[idx];
+  commands[idx] = cmd; // 배열도 동기화
   // 명령어 이름과 괄호 사이 공백 제거 (최종 안전장치)
   cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\(/g, '$1(');
   cmd = cmd.replace(/([A-Za-z가-힣_]\w*)\s+\[/g, '$1[');
@@ -1455,8 +1478,24 @@ function renderTextWithLatex(text) {
   return result;
 }
 
+// 명령어 편집 시 commands 배열 업데이트
+function updateCommand(input, idx) {
+  commands[idx] = input.value;
+  // 적용 버튼이 이미 눌렸다면 다시 활성화
+  var btn = input.parentElement.querySelector('.apply-btn');
+  if (btn && btn.disabled) {
+    btn.textContent = '▶ 적용';
+    btn.className = 'apply-btn';
+    btn.disabled = false;
+  }
+}
+
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── 전체 화면 캡처 저장 ───────────────────────────────────────
