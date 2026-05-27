@@ -1423,11 +1423,7 @@ function renderMessage(text) {
         cmd = cmd.replace(/\)\s+([A-Za-z])/g, ')*$1');
         var idx = commands.length;
         commands.push(cmd);
-        var dimBtn = is3DCommand(cmd)
-          ? '<button class="dim-btn btn-3d" onclick="switchPerspective(\'3d\')" title="3D 그래픽스로 전환">🌐 3D</button>'
-          : '<button class="dim-btn btn-2d" onclick="switchPerspective(\'2d\')" title="2D 그래픽스로 전환">📐 2D</button>';
         html += '<div class="cmd-block">'
-          + dimBtn
           + '<input class="cmd-input" type="text" value="' + escAttr(cmd) + '"'
           + ' oninput="updateCommand(this,' + idx + ')"'
           + ' title="클릭하여 편집 가능">'
