@@ -1372,12 +1372,18 @@ function showNotice() {
 }
 
 function renderMessage(text) {
-  // AI가 [CMD] 대신 마크다운 코드블록(```geogebra 또는 ```)을 쓸 경우 자동 변환
-  text = text.replace(/```(?:geogebra|ggb|GeoGebra)?\s*([\s\S]*?)```/g, function(match, code) {
-    var lines = code.trim().split('\n');
+  // AI가 [CMD] 대신 마크다운 코드블록을 쓸 경우 자동 변환
+  text = text.replace(/```(\w*)\s*([\s\S]*?)```/g, function(match, lang, code) {
+    code = code.trim();
+    // 이미 [CMD] 태그가 포함된 경우 → 코드블록 제거 후 내용만 반환 (이중 래핑 방지)
+    if (code.indexOf('[CMD]') !== -1) return code;
+    // 언어 식별자만 있는 줄 등 GeoGebra 명령어가 아닌 줄 제외
+    var skipLine = /^(plaintext|text|python|javascript|js|java|cpp|c\+\+|geogebra|ggb|html|css|bash|sh|r)$/i;
+    var lines = code.split('\n');
     return lines.map(function(l) {
       l = l.trim();
-      return l ? '[CMD]' + l + '[/CMD]' : '';
+      if (!l || skipLine.test(l) || l.startsWith('//') || l.startsWith('#')) return '';
+      return '[CMD]' + l + '[/CMD]';
     }).filter(Boolean).join('\n');
   });
 
