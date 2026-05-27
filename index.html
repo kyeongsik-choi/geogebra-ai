@@ -255,15 +255,6 @@
       background: rgba(121,192,255,0.07);
       border-radius: 3px 3px 0 0;
     }
-    .dim-btn {
-      border: none; border-radius: 5px; padding: 4px 8px;
-      cursor: pointer; font-size: 11px; white-space: nowrap;
-      flex-shrink: 0; transition: background 0.15s; font-weight: 600;
-    }
-    .dim-btn.btn-3d { background: #7c3aed; color: #fff; }
-    .dim-btn.btn-3d:hover { background: #6d28d9; }
-    .dim-btn.btn-2d { background: #0e7490; color: #fff; }
-    .dim-btn.btn-2d:hover { background: #0c6377; }
     .apply-btn {
       background: #238636;
       color: white;
@@ -1497,22 +1488,6 @@ function renderTextWithLatex(text) {
   return result;
 }
 
-// 3D 명령어 여부 감지
-function is3DCommand(cmd) {
-  return /\b(Surface|Plane|Sphere|Cone|Cylinder|Pyramid|Prism|Tetrahedron|Cube|Octahedron|Icosahedron|Dodecahedron|Net|Quadric|IntersectConic|Bottom|Top|Side|Volume|Height3D)\s*\(/i.test(cmd);
-}
-
-// GeoGebra 2D/3D 화면 전환 (대수 패널 포함)
-function switchPerspective(mode) {
-  if (!ggbLoaded || !window.ggbApplet) { alert('GeoGebra가 아직 로딩 중입니다.'); return; }
-  if (mode === '3d') {
-    // A = 대수 패널, T = 3D 그래픽스
-    ggbApplet.setPerspective('AT');
-  } else {
-    // A = 대수 패널, G = 2D 그래픽스
-    ggbApplet.setPerspective('AG');
-  }
-}
 
 // LaTeX 코드 → GeoGebra 문법 변환
 function cleanLatex(cmd) {
