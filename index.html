@@ -72,6 +72,20 @@
       transition: background 0.15s;
     }
     #clear-chat-btn:hover { background: #545b62; }
+    #lang-btn {
+      padding: 6px 14px;
+      background: #2c5f8a;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    #lang-btn:hover { background: #3a7abf; }
+    #lang-btn.english { background: #1a6b3a; }
+    #lang-btn.english:hover { background: #238a4a; }
     /* localStorage 저장 표시 */
     .save-indicator {
       font-size: 10px;
@@ -571,6 +585,7 @@
   <button id="save-chat-btn" onclick="exportChat()">💾 대화 저장</button>
   <button id="clear-chat-btn" onclick="clearChat()">🗑️ 초기화</button>
   <button id="capture-btn" onclick="captureApp()">📸 화면 저장</button>
+  <button id="lang-btn" onclick="toggleLang()" title="언어 전환">🌐 한국어</button>
 </div>
 
 <div id="tab-bar">
@@ -625,7 +640,7 @@ function getGgbSize() {
 }
 var sz = getGgbSize();
 var ggbParams = {
-  appName: 'suite',
+  appName: 'classic',
   width: sz.w || 800,
   height: sz.h || 600,
   showToolBar: true,
@@ -772,11 +787,12 @@ function callAI(messages, maxTokens) {
   var finalMessages = augmented.map(function(msg, idx) {
     if (idx === augmented.length - 1 && msg.role === 'user') {
       var originalContent = msg.content;
+      var langReminder = UI_TEXT[currentLang].langReminder;
       if (typeof originalContent === 'string') {
-        return { role: 'user', content: originalContent + '\n\n[반드시 한국어로만 답변하세요. No English.]' };
+        return { role: 'user', content: originalContent + langReminder };
       } else if (Array.isArray(originalContent)) {
         var newContent = originalContent.slice();
-        newContent.push({ type: 'text', text: '\n\n[반드시 한국어로만 답변하세요. No English.]' });
+        newContent.push({ type: 'text', text: langReminder });
         return { role: 'user', content: newContent };
       }
     }
@@ -899,6 +915,139 @@ var chatHistory = [{
 var isLoading = false;
 var commands = [];
 var pendingImage = null;
+
+// ── 언어 설정 ─────────────────────────────────────────────────
+var currentLang = localStorage.getItem('ggb_lang') || 'ko';
+
+var UI_TEXT = {
+  ko: {
+    langBtn: '🌐 English',
+    bookBtn: '📚 교재 학습',
+    saveBtn: '💾 대화 저장',
+    clearBtn: '🗑️ 초기화',
+    captureBtn: '📸 화면 저장',
+    analyzeBtn: '🔍 현재 화면 분석',
+    chatTitle: 'AI 어시스턴트 (GPT-4o)',
+    placeholder: '질문을 입력하세요 (Enter: 전송 / Shift+Enter: 줄바꿈)',
+    sendBtn: '전송',
+    tabGgb: '📐 GeoGebra',
+    tabChat: '💬 AI 채팅',
+    applyBtn: '▶ 적용',
+    applied: '✓ 적용됨',
+    error: '✗ 오류',
+    typing: '답변 생성 중',
+    noticeHtml:
+      '<span style="font-size:1.1em;">👋</span> 안녕하세요! <strong>GeoGebra AI 도우미</strong>입니다.<br><br>' +
+      '⚠️ <strong>주의:</strong> AI가 제안하는 GeoGebra 명령어는 <strong>틀릴 수 있습니다.</strong><br>' +
+      '▶ 적용 버튼을 누르기 전에 명령어를 꼭 확인해 주세요.<br>' +
+      '오류가 생기면 <strong>지우기</strong> 버튼으로 초기화할 수 있습니다.',
+    langReminder: '\n\n[반드시 한국어로만 답변하세요. No English.]',
+    systemLang: '🚨 [언어 규칙 — 절대 원칙] 모든 답변은 반드시 한국어로만 작성하세요. 영어 사용 금지. You MUST respond in Korean only. Never use English in your responses.',
+    systemLangEnd: '⚠️ 최종 언어 규칙: 위 내용을 포함하여 모든 답변은 반드시 한국어로만 작성하세요. 영어로 답변하는 것은 절대 금지입니다. 이미지나 수식을 분석할 때도 반드시 한국어로 설명하세요.'
+  },
+  en: {
+    langBtn: '🌐 한국어',
+    bookBtn: '📚 Textbook',
+    saveBtn: '💾 Save Chat',
+    clearBtn: '🗑️ Clear',
+    captureBtn: '📸 Save Screen',
+    analyzeBtn: '🔍 Analyze View',
+    chatTitle: 'AI Assistant (GPT-4o)',
+    placeholder: 'Ask a question (Enter: send / Shift+Enter: new line)',
+    sendBtn: 'Send',
+    tabGgb: '📐 GeoGebra',
+    tabChat: '💬 AI Chat',
+    applyBtn: '▶ Apply',
+    applied: '✓ Applied',
+    error: '✗ Error',
+    typing: 'Generating response',
+    noticeHtml:
+      '<span style="font-size:1.1em;">👋</span> Welcome to <strong>GeoGebra AI Assistant</strong>!<br><br>' +
+      '⚠️ <strong>Note:</strong> GeoGebra commands suggested by AI <strong>may be incorrect.</strong><br>' +
+      '▶ Please verify each command before applying.<br>' +
+      'Use the <strong>Clear</strong> button to reset if something goes wrong.',
+    langReminder: '\n\n[Please respond in English only.]',
+    systemLang: '🚨 [Language Rule] You MUST respond in English only. Never use Korean or any other language.',
+    systemLangEnd: '⚠️ Final language rule: Always respond in English only. Never switch to Korean or any other language.'
+  }
+};
+
+function applyLangUI() {
+  var t = UI_TEXT[currentLang];
+  var set = function(id, text) { var el = document.getElementById(id); if (el) el.textContent = text; };
+  var setHtml = function(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; };
+  set('lang-btn', t.langBtn);
+  document.getElementById('lang-btn').className = currentLang === 'en' ? 'english' : '';
+  setHtml('book-btn', '📚 ' + t.bookBtn.replace('📚 ',''));
+  set('save-chat-btn', t.saveBtn);
+  set('clear-chat-btn', t.clearBtn);
+  set('capture-btn', t.captureBtn);
+  set('analyze-btn', t.analyzeBtn);
+  set('chat-header-title', t.chatTitle);
+  set('send-btn', t.sendBtn);
+  var inp = document.getElementById('chat-input');
+  if (inp) inp.placeholder = t.placeholder;
+  var tabGgb = document.getElementById('tab-ggb');
+  if (tabGgb) tabGgb.textContent = t.tabGgb;
+  var tabChat = document.getElementById('tab-chat');
+  if (tabChat) tabChat.textContent = t.tabChat;
+}
+
+function rebuildSystemPrompt() {
+  var t = UI_TEXT[currentLang];
+  var isEn = currentLang === 'en';
+  chatHistory[0] = {
+    role: 'system',
+    content: [
+      t.systemLang,
+      '',
+      isEn ? 'You are an expert GeoGebra Suite math assistant.' : '당신은 GeoGebra Suite 전문 수학 도우미입니다.',
+      '',
+      isEn ? '【Core Rules — Must Follow】' : '【핵심 규칙 — 반드시 지켜야 합니다】',
+      isEn ? '▶ Each GeoGebra command must use its own [CMD]...[/CMD] block.' : '▶ GeoGebra 명령어는 반드시 명령어 하나당 [CMD]...[/CMD] 블록 하나를 사용하세요.',
+      isEn ? '▶ Never put multiple commands inside one [CMD] block.' : '▶ 하나의 [CMD] 블록 안에 절대 여러 명령어를 넣지 마세요.',
+      isEn ? '▶ Do not group commands with line breaks.' : '▶ 줄바꿈으로 여러 명령어를 묶지 마세요.',
+      '',
+      isEn ? '✅ Correct (one block per command):' : '✅ 올바른 예시 (명령어마다 별도 블록):',
+      '[CMD]A = (0, 0)[/CMD]',
+      '[CMD]B = (4, 0)[/CMD]',
+      '[CMD]C = (2, 3)[/CMD]',
+      '[CMD]Polygon(A, B, C)[/CMD]',
+      '',
+      isEn ? '❌ Wrong (multiple commands in one block):' : '❌ 잘못된 예시 (여러 명령어를 하나의 블록에 넣으면 안 됨):',
+      '[CMD]A = (0, 0)',
+      'B = (4, 0)',
+      'Polygon(A, B)[/CMD]',
+      '',
+      isEn ? 'GeoGebra command examples:' : '올바른 GeoGebra Suite 명령어 예시:',
+      '- ' + (isEn ? 'Point' : '점') + ': [CMD]A = (2, 3)[/CMD]',
+      '- ' + (isEn ? 'Circle' : '원') + ': [CMD]c = Circle((0,0), 3)[/CMD]',
+      '- ' + (isEn ? 'Line' : '직선') + ': [CMD]l = Line((0,0),(2,3))[/CMD]',
+      '- ' + (isEn ? 'Segment' : '선분') + ': [CMD]s = Segment(A, B)[/CMD]',
+      '- ' + (isEn ? 'Function' : '함수') + ': [CMD]f(x) = x^2 - 2x + 1[/CMD]',
+      '- ' + (isEn ? 'Polygon' : '다각형') + ': [CMD]Polygon((0,0),(4,0),(2,3))[/CMD]',
+      '- ' + (isEn ? 'Midpoint' : '중점') + ': [CMD]M = Midpoint(A, B)[/CMD]',
+      '- ' + (isEn ? 'Tangent' : '접선') + ': [CMD]t = Tangent(A, c)[/CMD]',
+      '- ' + (isEn ? 'Intersect' : '교점') + ': [CMD]P = Intersect(f, g)[/CMD]',
+      '- ' + (isEn ? 'Vector' : '벡터') + ': [CMD]u = Vector((1,2))[/CMD]',
+      '- ' + (isEn ? 'Perpendicular' : '수선') + ': [CMD]h = PerpendicularLine(A, l)[/CMD]',
+      '- ' + (isEn ? 'Angle' : '각도') + ': [CMD]alpha = Angle(A, B, C)[/CMD]',
+      '',
+      isEn
+        ? 'Math formulas: Use LaTeX. Inline: $formula$, display: $$formula$$.'
+        : '수식 표현 규칙: 수학 수식은 반드시 LaTeX 형식으로 작성하세요. 인라인 수식은 $수식$, 별도 줄 수식은 $$수식$$으로 표기하세요.',
+      '',
+      t.systemLangEnd
+    ].join('\n')
+  };
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'ko' ? 'en' : 'ko';
+  localStorage.setItem('ggb_lang', currentLang);
+  applyLangUI();
+  rebuildSystemPrompt();
+}
 
 // ══════════════════════════════════════════════════════════
 // 📚 교재 학습 (경량 RAG)
@@ -1357,6 +1506,8 @@ function appendMessage(role, content, parseCmd, isAnalysis) {
 // 페이지 로드 시 이전 대화 복원
 window.addEventListener('load', function() {
   ggbApp.inject('ggb-element');
+  applyLangUI();
+  rebuildSystemPrompt();
   loadFromLocal();
   showNotice();
 });
@@ -1365,11 +1516,7 @@ function showNotice() {
   var container = document.getElementById('chat-messages');
   var el = document.createElement('div');
   el.className = 'message notice';
-  el.innerHTML =
-    '<span style="font-size:1.1em;">👋</span> 안녕하세요! <strong>GeoGebra AI 도우미</strong>입니다.<br><br>' +
-    '⚠️ <strong>주의:</strong> AI가 제안하는 GeoGebra 명령어는 <strong>틀릴 수 있습니다.</strong><br>' +
-    '▶ 적용 버튼을 누르기 전에 명령어를 꼭 확인해 주세요.<br>' +
-    '오류가 생기면 <strong>지우기</strong> 버튼으로 초기화할 수 있습니다.';
+  el.innerHTML = UI_TEXT[currentLang].noticeHtml;
   container.appendChild(el);
 }
 
@@ -1459,7 +1606,7 @@ function showTyping() {
   var container = document.getElementById('chat-messages');
   var el = document.createElement('div');
   el.className = 'typing-indicator';
-  el.innerHTML = '답변 생성 중<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  el.innerHTML = UI_TEXT[currentLang].typing + '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
   container.appendChild(el);
   container.scrollTop = container.scrollHeight;
   return el;
