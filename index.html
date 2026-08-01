@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GeoGebra AI 도우미</title>
+  <title>GeoGebra AI 결합 시스템</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <!-- KaTeX -->
@@ -579,7 +579,7 @@
 </div>
 
 <div id="header">
-  <h1>◆ GeoGebra AI 도우미</h1>
+  <h1>◆ GeoGebra AI 결합 시스템</h1>
   <span>Powered by ChatGPT (GPT-4o)</span>
   <button id="book-btn" onclick="openBookModal()">📚 교재 학습<span id="book-dot"></span></button>
   <button id="save-chat-btn" onclick="exportChat()">💾 대화 저장</button>
@@ -605,7 +605,7 @@
 
     <div id="chat-messages">
       <div class="message assistant">
-        안녕하세요! GeoGebra AI 도우미입니다.<br><br>
+        안녕하세요! GeoGebra AI 결합 시스템입니다.<br><br>
         • 질문을 입력하면 GeoGebra 명령어를 제안해 드려요.<br>
         • <strong>▶ 적용</strong> 버튼으로 바로 그래프에 반영할 수 있어요.<br>
         • <strong>🔍 현재 화면 분석</strong>으로 그려진 개체들을 AI가 분석해 드려요.<br>
@@ -937,7 +937,7 @@ var UI_TEXT = {
     error: '✗ 오류',
     typing: '답변 생성 중',
     noticeHtml:
-      '<span style="font-size:1.1em;">👋</span> 안녕하세요! <strong>GeoGebra AI 도우미</strong>입니다.<br><br>' +
+      '<span style="font-size:1.1em;">👋</span> 안녕하세요! <strong>GeoGebra AI 결합 시스템</strong>입니다.<br><br>' +
       '⚠️ <strong>주의:</strong> AI가 제안하는 GeoGebra 명령어는 <strong>틀릴 수 있습니다.</strong><br>' +
       '▶ 적용 버튼을 누르기 전에 명령어를 꼭 확인해 주세요.<br>' +
       '오류가 생기면 <strong>지우기</strong> 버튼으로 초기화할 수 있습니다.',
@@ -1318,7 +1318,7 @@ function exportChat() {
 
   // 1) 대화 텍스트 저장 (.txt)
   if (savedMessages.length > 0) {
-    var lines = ['GeoGebra AI 도우미 대화 기록', '='.repeat(40), ''];
+    var lines = ['GeoGebra AI 결합 시스템 대화 기록', '='.repeat(40), ''];
     savedMessages.forEach(function(m) {
       var roleLabel = m.role === 'user' ? '👤 사용자' : '🤖 AI';
       var time = m.time ? '[' + m.time + '] ' : '';
@@ -1367,7 +1367,7 @@ function clearChat() {
   container.innerHTML = '';
   var el = document.createElement('div');
   el.className = 'message assistant';
-  el.innerHTML = '안녕하세요! GeoGebra AI 도우미입니다.<br><br>'
+  el.innerHTML = '안녕하세요! GeoGebra AI 결합 시스템입니다.<br><br>'
     + '• 질문을 입력하면 GeoGebra 명령어를 제안해 드려요.<br>'
     + '• <strong>▶ 적용</strong> 버튼으로 바로 그래프에 반영할 수 있어요.<br>'
     + '• <strong>🔍 현재 화면 분석</strong>으로 그려진 개체들을 AI가 분석해 드려요.<br>'
