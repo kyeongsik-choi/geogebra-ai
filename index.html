@@ -86,6 +86,18 @@
     #lang-btn:hover { background: #3a7abf; }
     #lang-btn.english { background: #1a6b3a; }
     #lang-btn.english:hover { background: #238a4a; }
+    #ggb-load-btn {
+      padding: 6px 14px;
+      background: #7d3c98;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    #ggb-load-btn:hover { background: #9b59b6; }
     /* localStorage 저장 표시 */
     .save-indicator {
       font-size: 10px;
@@ -581,6 +593,8 @@
 <div id="header">
   <h1>◆ GeoGebra AI 결합 시스템</h1>
   <span>Powered by ChatGPT (GPT-4o)</span>
+  <button id="ggb-load-btn" onclick="document.getElementById('ggb-file-input').click()">📂 GGB 불러오기</button>
+  <input type="file" id="ggb-file-input" accept=".ggb" style="display:none" onchange="loadGgbFile(this)">
   <button id="book-btn" onclick="openBookModal()">📚 교재 학습<span id="book-dot"></span></button>
   <button id="save-chat-btn" onclick="exportChat()">💾 대화 저장</button>
   <button id="clear-chat-btn" onclick="clearChat()">🗑️ 초기화</button>
@@ -1379,6 +1393,81 @@ function clearChat() {
     ggbApplet.newConstruction();
     localStorage.removeItem('ggb_state');
   }
+}
+
+function loadGgbFile(input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.ggb')) {
+    alert('.ggb 파일만 업로드할 수 있습니다.');
+    return;
+  }
+  if (!ggbLoaded || !window.ggbApplet) {
+    alert('GeoGebra가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var bytes = new Uint8Array(e.target.result);
+    var binary = '';
+    for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    var base64 = btoa(binary);
+
+    try {
+      ggbApplet.setBase64(base64);
+    } catch(err) {
+      appendMessage('assistant', '⚠️ GGB 파일 로드 중 오류가 발생했습니다: ' + err.message, false);
+      return;
+    }
+
+    // GeoGebra가 파일을 처리할 시간을 준 후 명령어 추출
+    setTimeout(function() {
+      extractGgbCommands(file.name);
+    }, 1200);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function extractGgbCommands(filename) {
+  var names;
+  try {
+    names = ggbApplet.getAllObjectNames();
+  } catch(err) {
+    names = [];
+  }
+
+  var intro = '📂 **' + filename + '** 파일을 GeoGebra에 불러왔습니다.\n\n';
+
+  if (!names || names.length === 0) {
+    appendMessage('assistant', intro + '(추출 가능한 명령어가 없습니다.)', true);
+    return;
+  }
+
+  var cmds = [];
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i];
+    var cmd = '';
+    try { cmd = ggbApplet.getCommandString(name); } catch(e) {}
+    if (cmd) {
+      cmds.push(cmd);
+    } else {
+      // 명령어가 없으면 값 정의로 대체
+      var val = '';
+      try { val = ggbApplet.getValueString(name); } catch(e) {}
+      if (val && val !== '?') cmds.push(name + ' = ' + val);
+    }
+  }
+
+  var msg = intro + '**추출된 명령어 ' + cmds.length + '개** — ▶ 버튼으로 하나씩 재적용하거나 편집할 수 있습니다.\n\n';
+  if (cmds.length > 0) {
+    msg += cmds.map(function(c) { return '[CMD]' + c + '[/CMD]'; }).join('\n');
+  } else {
+    msg += '(이 파일에서는 명령어 텍스트를 추출할 수 없습니다. GeoGebra에는 정상적으로 로드되었습니다.)';
+  }
+
+  appendMessage('assistant', msg, true);
 }
 
 function setLoading(val) {
